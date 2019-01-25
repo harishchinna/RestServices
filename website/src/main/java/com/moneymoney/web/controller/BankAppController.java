@@ -16,8 +16,10 @@ import org.springframework.web.servlet.ModelAndView;
 
 import com.moneymoney.web.entity.CurrentDataSet;
 import com.moneymoney.web.entity.Transaction;
+import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 
 @Controller
+/* @EnableHystrix */
 public class BankAppController {
 
 	@Autowired
@@ -34,9 +36,15 @@ public class BankAppController {
 	}
 
 	@RequestMapping("/deposit")
+	@HystrixCommand(fallbackMethod = "depositFail")
 	public String deposit(@ModelAttribute Transaction transaction, Model model) {
 		restTemplate.postForEntity("http://localhost:9090/transactions/deposit", transaction, null);
 		model.addAttribute("message", "Success!");
+		return "DepositForm";
+	}
+	public String depositFail(@ModelAttribute Transaction transaction, Model model)
+	{
+		model.addAttribute("message", "Wait For Sometime To Deposit!");
 		return "DepositForm";
 	}
 
@@ -46,11 +54,18 @@ public class BankAppController {
 	}
 
 	@RequestMapping("/withdraw")
+	@HystrixCommand(fallbackMethod = "withdrawFail")
 	public String withdraw(@ModelAttribute Transaction transaction, Model model) {
 		restTemplate.postForEntity("http://localhost:9090/transactions/withdraw", transaction, null);
 		model.addAttribute("message", "Success!");
 		return "WithdrawForm";
 	}
+	public String withdrawFail(@ModelAttribute Transaction transaction, Model model)
+	{
+		model.addAttribute("message", "Wait For Sometime To Withdraw!");
+		return "WithdrawForm";
+	}
+	
 	@RequestMapping("/transfer")
 	public String transfer()
 	{
@@ -58,6 +73,7 @@ public class BankAppController {
 	}
 	
 	@RequestMapping("/fundtransfer")
+	@HystrixCommand(fallbackMethod = "fundTransferFail")
 	public String fundsTransfer(@RequestParam("senderaccountNumber") int senderaccountNumber,@RequestParam("receiveraccountNumber") int receiveraccountNumber,@RequestParam("amount") int amount,@ModelAttribute Transaction transaction,Model model) {
 		transaction.setAccountNumber(senderaccountNumber);
 		restTemplate.postForEntity("http://localhost:9090/transactions/withdraw", transaction, null);
@@ -66,6 +82,13 @@ public class BankAppController {
 		model.addAttribute("message", "success!");
 		return "FundTransferForm";
 	}
+	public String fundTransferFail(@RequestParam("senderaccountNumber") int senderaccountNumber,@RequestParam("receiveraccountNumber") int receiveraccountNumber,@RequestParam("amount") int amount,@ModelAttribute Transaction transaction,Model model)
+	{
+		model.addAttribute("message", "Wait For Sometime To Fund Transfer!");
+		return "FundTransferForm";
+		
+	}
+	
 	@RequestMapping("/statementform")
 	public String getMiniStatement()
 	{
@@ -73,6 +96,7 @@ public class BankAppController {
 	}
 	
 	@RequestMapping("/statement")
+	@HystrixCommand(defaultFallback = "statementFailure")
 	public ModelAndView getStatement(@RequestParam("offset") int offset, @RequestParam("size") int size) {
 		int currentSize = size==0?5:size;
 		int currentOffset = offset==0?1:offset;
@@ -91,6 +115,10 @@ public class BankAppController {
 		currentDataSet.setNextLink(next);
 		currentDataSet.setTransactions(transactions);
 		return new ModelAndView("statementForm", "currentDataSet", currentDataSet);
+	}
+	public ModelAndView statementFailure()
+	{
+		return new ModelAndView("StatementFailureForm", "currentDataSet",new CurrentDataSet());
 	}
 
 }
